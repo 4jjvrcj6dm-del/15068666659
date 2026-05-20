@@ -1,71 +1,58 @@
-# iOS App 自动化构建 & 部署到 App Store Connect
-# ====================================================
-# 使用方式:
-#   GitHub 页面 -> Actions -> iOS Build & Deploy -> Run workflow
-# 前置条件 - 需要在 GitHub Secrets 中配置:
-#   1. APP_STORE_CONNECT_KEY_ID     - App Store Connect API Key ID
-#   2. APP_STORE_CONNECT_ISSUER_ID  - App Store Connect Issuer ID  
-#   3. APP_STORE_CONNECT_KEY        - App Store Connect API Key (P8 文件内容)
-#   4. MATCH_PASSWORD               - (可选) 如果使用 match 管理证书
-# 快速配置说明:
-#   - 登录 https://appstoreconnect.apple.com/access/api 创建 API Key
-#   - 将 Key ID、Issuer ID、下载的 .p8 文件内容添加到 GitHub Secrets
-#   - 在本地 Mac 运行 fastlane match init 初始化证书管理
+# iOS App 自动化构建 IPA
+# ========================
+# 手动触发: Actions -> iOS Build -> Run workflow
+# 前置条件 - GitHub Secrets:
+#   APP_STORE_CONNECT_KEY_ID
+#   APP_STORE_CONNECT_ISSUER_ID
+#   APP_STORE_CONNECT_KEY
 
-name: iOS Build & Deploy
+name: iOS Build
 
 on:
   workflow_dispatch:
     inputs:
-      release_notes:
-        description: '更新说明'
-        required: false
-        default: '自动构建发布'
       skip_upload:
         description: '跳过上传（仅构建测试）'
         type: boolean
         default: false
 
-  push:
-    branches:
-      - main
-      - release/*
-    paths-ignore:
-      - '.github/**'
-      - 'README.md'
-
 env:
   PROJECT_PATH: Chat/Chat/Swift/TUIKitDemo
   WORKSPACE_NAME: TUIKitDemo.xcworkspace
   SCHEME_NAME: TUIKitDemo
-  XCODE_VERSION: '16.2'
 
 jobs:
   build:
-    name: 🏗 Build & Upload iOS App
+    name: Build & Upload
     runs-on: macos-15
-
+    
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: false
 
-      - name: 🔧 Select Xcode ${{ env.XCODE_VERSION }}
+      - name: List available Xcode versions
+        run: ls /Applications | grep Xcode
+
+      - name: Select Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_${XCODE_VERSION}.app
+          XCODE_APP=$(ls /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP"
           xcodebuild -version
 
-      - name: 💎 Install CocoaPods & Fastlane
+      - name: Install CocoaPods
         run: |
-          gem install cocoapods fastlane
+          gem install cocoapods
           pod --version
-          fastlane --version
 
-      - name: 🔨 Install Pods
+      - name: Install Pods
         run: |
           cd ${{ env.PROJECT_PATH }}
           pod install --repo-update
 
-      - name: 🔐 Import App Store Connect API Key
+      - name: Import App Store Connect API Key
         env:
           APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
         run: |
@@ -73,71 +60,62 @@ jobs:
           echo "$APP_STORE_CONNECT_KEY" > ~/.fastlane/app_store_connect_key.p8
           chmod 600 ~/.fastlane/app_store_connect_key.p8
 
-      - name: 🔐 Setup signing certificate (Match)
-        env:
-          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          MATCH_KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          # 使用 fastlane match 自动管理签名证书
-          # 如果还没有配置 match，第一次需要在本地 Mac 运行:
-          #   fastlane match init
-          #   fastlane match appstore
-          #
-          # 然后在 GitHub Secrets 中添加:
-          #   MATCH_GIT_URL: 证书仓库地址
-          #   MATCH_PASSWORD: 证书加密密码
-          
-          if [ -n "$MATCH_GIT_URL" ]; then
-            cd ${{ env.PROJECT_PATH }}
-            fastlane run match type:appstore readonly:true
-          else
-            echo "⚠️ MATCH_GIT_URL 未配置，使用自动签名(需要 Apple ID 密码)"
-            echo "  请在本地 Mac 运行: fastlane match init 初始化"
-          fi
-
-      - name: 🏗 Build & Archive
+      - name: Build Archive
         run: |
           cd ${{ env.PROJECT_PATH }}
-          fastlane run gym \
-            workspace:"$WORKSPACE_NAME" \
-            scheme:"$SCHEME_NAME" \
-            configuration:"Release" \
-            clean:true \
-            export_method:"app-store" \
-            output_directory:"$RUNNER_TEMP/IPA" \
-            output_name:"TUIKitDemo.ipa" \
-            use_automatic_signing:true
+          xcodebuild clean archive \
+            -workspace "$WORKSPACE_NAME" \
+            -scheme "$SCHEME_NAME" \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/TUIKitDemo.xcarchive" \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=S5SAS3UH9
 
-      - name: 🚀 Upload IPA to App Store Connect
+      - name: Export IPA
+        run: |
+          cd ${{ env.PROJECT_PATH }}
+          cat > exportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>S5SAS3UH9</string>
+              <key>compileBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+          
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/TUIKitDemo.xcarchive" \
+            -exportPath "$RUNNER_TEMP/IPA" \
+            -exportOptionsPlist exportOptions.plist \
+            -allowProvisioningUpdates
+
+      - name: Upload IPA
         if: ${{ !inputs.skip_upload }}
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
-          cd ${{ env.PROJECT_PATH }}
-          # 使用 App Store Connect API Key 上传
-          fastlane run upload_to_app_store \
-            skip_metadata:true \
-            skip_screenshots:true \
-            skip_binary_upload:false \
-            submit_for_review:false \
-            api_key_path:"~/.fastlane/app_store_connect_key.p8" \
-            api_key_id:"$APP_STORE_CONNECT_KEY_ID" \
-            api_key_issuer_id:"$APP_STORE_CONNECT_ISSUER_ID"
+          xcrun altool --upload-app \
+            -f "$RUNNER_TEMP/IPA/TUIKitDemo.ipa" \
+            -u "@keychain:AC_PASSWORD" \
+            -apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            -apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --verbose
 
-      - name: 📦 Upload IPA as Artifact
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: TUIKitDemo-IPA
           path: ${{ runner.temp }}/IPA/TUIKitDemo.ipa
           retention-days: 30
-
-      - name: ✅ Done!
-        run: |
-          echo "=========================================="
-          echo "  🎉 构建完成！"
-          echo "  IPA 文件已保存到构建产物中"
-          echo "  如需发布到 App Store，请在 GitHub 上"
-          echo "  重新选择 'skip_upload: false' 运行"
-          echo "=========================================="
