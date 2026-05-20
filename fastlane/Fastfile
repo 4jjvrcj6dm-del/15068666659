@@ -1,0 +1,80 @@
+# Fastlane 自动化构建配置
+# 使用方法: fastlane release  # 构建并上传到 App Store Connect
+
+default_platform(:ios)
+
+platform :ios do
+
+  ########################################################################
+  # lane: release - 构建 Release 版本并上传到 App Store Connect
+  # 使用方式: fastlane release
+  # 前提条件:
+  #   1. 在 GitHub Secrets 中配置 APP_STORE_CONNECT_KEY_ID / APP_STORE_CONNECT_ISSUER_ID / APP_STORE_CONNECT_KEY
+  #   2. 或在本地用 fastlane match 管理签名证书
+  ########################################################################
+  lane :release do
+    # 1. 确保 CocoaPods 已安装
+    cocoapods(
+      clean_install: true,
+      podfile: "Chat/Chat/Swift/TUIKitDemo/Podfile"
+    )
+
+    # 2. 构建并导出 IPA
+    gym(
+      workspace: "Chat/Chat/Swift/TUIKitDemo/TUIKitDemo.xcworkspace",
+      scheme: "TUIKitDemo",
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "TUIKitDemo.ipa",
+      use_automatic_signing: true,
+      # 使用 App Store Connect API Key 自动签名
+      # 如果使用 match 管理证书，去掉下面的注释
+      # include_bitcode: false,
+      # include_symbols: true
+    )
+
+    # 3. 上传到 App Store Connect
+    upload_to_app_store(
+      skip_metadata: true,     # 跳过元数据更新
+      skip_screenshots: true,  # 跳过截图上传
+      skip_binary_upload: false,
+      submit_for_review: false # 不上架审核，只上传
+    )
+  end
+
+  ########################################################################
+  # lane: build_only - 仅构建 IPA，不上传
+  # 用于测试构建是否正常
+  ########################################################################
+  lane :build_only do
+    cocoapods(
+      clean_install: true,
+      podfile: "Chat/Chat/Swift/TUIKitDemo/Podfile"
+    )
+    
+    gym(
+      workspace: "Chat/Chat/Swift/TUIKitDemo/TUIKitDemo.xcworkspace",
+      scheme: "TUIKitDemo",
+      configuration: "Release",
+      clean: true,
+      export_method: "development",
+      output_directory: "./build",
+      output_name: "TUIKitDemo.ipa",
+      use_automatic_signing: true
+    )
+  end
+end
+
+########################################################################
+# 错误处理
+########################################################################
+error do |lane, exception|
+  # 构建失败时输出错误信息
+  UI.error("构建失败: #{exception.message}")
+  slack(
+    message: "iOS 构建失败: #{exception.message}",
+    success: false
+  ) if ENV["CI"]
+end

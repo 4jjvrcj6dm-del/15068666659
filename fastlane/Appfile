@@ -1,0 +1,12 @@
+# App Store Connect 配置
+# 以下配置会被 fastlane 自动读取
+
+# app_identifier 从项目 Info.plist 读取
+# 如果需要手动指定:
+app_identifier("com.app.weiliao2027")
+
+# Apple ID（用于 altool 上传，二选一）
+# apple_id("your@apple.com")
+
+# 团队 ID（从 Xcode 项目自动读取）
+team_id("S5SAS3UH9")
