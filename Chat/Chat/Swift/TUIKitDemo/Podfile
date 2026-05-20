@@ -1,0 +1,86 @@
+# Uncomment the next line to define a global platform for your project
+platform :ios, '13.0'
+install! 'cocoapods', :disable_input_output_paths => true
+
+target 'TUIKitDemo' do
+  # Uncomment the next line if you're using Swift or would like to use dynamic frameworks
+  use_frameworks!
+  use_modular_headers!
+  # Pods for Example
+  pod 'TIMAppKit_Swift', :path => "../TUIKit/TIMAppKit"
+  pod 'TUICore', :path => "../TUIKit/TUICore"
+  pod 'TIMCommon_Swift', :path => "../TUIKit/TIMCommon"
+  pod 'TUIChat_Swift', :path => "../TUIKit/TUIChat"
+  pod 'TUIConversation_Swift', :path => "../TUIKit/TUIConversation"
+  pod 'TUIContact_Swift', :path => "../TUIKit/TUIContact"
+  pod 'TUISearch_Swift', :path => "../TUIKit/TUISearch"
+  pod 'TUITranslationPlugin_Swift', :path => "../TUIKit/TUITranslationPlugin"
+  pod 'TUIVoiceToTextPlugin_Swift', :path => "../TUIKit/TUIVoiceToTextPlugin"
+  pod 'TUIEmojiPlugin_Swift', :path => "../TUIKit/TUIEmojiPlugin"
+  pod 'TIMPush', '8.7.7201'
+  pod 'TUIConversationGroupPlugin_Swift', '8.7.7201'
+  pod 'TUIConversationMarkPlugin_Swift', '8.7.7201'
+  pod 'TUIPollPlugin_Swift', '8.7.7201'
+  pod 'TUIGroupNotePlugin_Swift', '8.7.7201'
+  
+  pod 'TXIMSDK_Plus_iOS_XCFramework', '8.7.7201'
+  pod 'TUICallKit_Swift/Professional', '3.1.0.824'
+  pod 'TXLiteAVSDK_Professional', '~> 12.4.17856'
+  pod 'MJExtension', '3.4.1'
+  pod 'MJRefresh', '3.7.5'
+  pod 'SnapKit', '5.7.1'
+  pod 'SSZipArchive', '2.4.3'
+  pod 'SDWebImage', '5.18.11'
+  
+end
+  
+  #Pods config
+  post_install do |installer|
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        
+        config.build_settings['STRIP_SWIFT_SYMBOLS'] = 'NO'
+        config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+        
+        #Fix Xcode14 Bundle target error
+        config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
+        config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+        
+        #Begin:Fix TXLiteAVSDK_Professional PhaseScriptExecution error
+        if target.name == 'TXLiteAVSDK_Professional'
+          config.build_settings['CODE_SIGNING_FORCED'] = 'NO'
+        end
+        #End:Fix TXLiteAVSDK_Professional PhaseScriptExecution error
+        
+        #Begin:Fix TUIConversation_Swift target error
+        if target.name == 'TUIConversation_Swift'
+          config.build_settings['CODE_SIGNING_FORCED'] = 'NO'
+        end
+        #End:Fix TUIConversation_Swift target error
+        
+        #Begin:Fix Xcode15 "-ld64"
+        xcode_version = `xcrun xcodebuild -version | grep Xcode | cut -d' ' -f2`.to_f
+        if xcode_version >= 15
+          xcconfig_path = config.base_configuration_reference.real_path
+          xcconfig = File.read(xcconfig_path)
+          if xcconfig.include?("OTHER_LDFLAGS") == false
+            xcconfig = xcconfig + "\n" + 'OTHER_LDFLAGS = $(inherited) "-ld64"'
+          else
+            if xcconfig.include?("OTHER_LDFLAGS = $(inherited)") == false
+              xcconfig = xcconfig.sub("OTHER_LDFLAGS", "OTHER_LDFLAGS = $(inherited)")
+            end
+            if xcconfig.include?("-ld64") == false
+              xcconfig = xcconfig.sub("OTHER_LDFLAGS = $(inherited)", 'OTHER_LDFLAGS = $(inherited) "-ld64"')
+            end
+          end
+          File.open(xcconfig_path, "w") { |file| file << xcconfig }
+        end
+        #End:Fix Xcode15 "-ld64"
+        
+      end
+    end
+end
