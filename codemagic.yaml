@@ -3,19 +3,19 @@ workflows:
     name: iOS Build
     environment:
       vars:
-        XCODE_WORKSPACE: "Chat/Chat/Swift/TUIKitDemo/TUIKitDemo.xcworkspace"
+        XCODE_WORKSPACE: "TUIKitDemo.xcworkspace"
         XCODE_SCHEME: "TUIKitDemo"
-        BUNDLE_ID: "com.app.weiliao2027"
+        APP_DIR: "Chat/Chat/Swift/TUIKitDemo"
         DEVELOPMENT_TEAM: "S5SAS3UH9"
       xcode: latest
     scripts:
       - name: Install CocoaPods
         script: |
-          cd Chat/Chat/Swift/TUIKitDemo
+          cd $APP_DIR
           pod install --repo-update
       - name: Build IPA
         script: |
-          cd Chat/Chat/Swift/TUIKitDemo
+          cd $APP_DIR
           xcodebuild clean archive \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -27,7 +27,7 @@ workflows:
             DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM
       - name: Export IPA
         script: |
-          cd Chat/Chat/Swift/TUIKitDemo
+          cd $APP_DIR
           xcodebuild -exportArchive \
             -archivePath build/TUIKitDemo.xcarchive \
             -exportPath build \
