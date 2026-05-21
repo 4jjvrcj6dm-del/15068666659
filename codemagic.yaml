@@ -7,8 +7,6 @@ workflows:
         XCODE_SCHEME: "TUIKitDemo"
         APP_DIR: "Chat/Chat/Swift/TUIKitDemo"
       xcode: latest
-      groups:
-        - appstore
     scripts:
       - name: Install CocoaPods
         script: |
@@ -17,7 +15,15 @@ workflows:
       - name: Install API Key
         script: |
           mkdir -p ~/private_keys
-          echo "$APP_STORE_CONNECT_KEY" > ~/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8
+          cat > ~/private_keys/AuthKey_5B94HC797Q.p8 << 'KEYEOF'
+-----BEGIN PRIVATE KEY-----
+MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgaQirVRh4iH37udOy
+XuIYNUDHDvPxm7mWC06Gbnvi75agCgYIKoZIzj0DAQehRANCAAQPR45DbXOxPBfL
+LqX/K8vKeJADZwOZSnuKXgfXHHdxKxPpRqUrT8lf0JVhQODCgto5krQpK4HDESAi
+qn42B3UN
+-----END PRIVATE KEY-----
+KEYEOF
+          chmod 600 ~/private_keys/AuthKey_5B94HC797Q.p8
       - name: Build Archive
         script: |
           cd $APP_DIR
@@ -28,9 +34,9 @@ workflows:
             -destination 'generic/platform=iOS' \
             -archivePath build/TUIKitDemo.xcarchive \
             -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8 \
-            -authenticationKeyID $APP_STORE_CONNECT_KEY_ID \
-            -authenticationKeyIssuerID $APP_STORE_CONNECT_ISSUER_ID
+            -authenticationKeyPath ~/private_keys/AuthKey_5B94HC797Q.p8 \
+            -authenticationKeyID 5B94HC797Q \
+            -authenticationKeyIssuerID 20bea6d9-e9af-4805-8ed1-84286ef63d49
       - name: Export IPA
         script: |
           cd $APP_DIR
@@ -41,9 +47,9 @@ workflows:
             -exportPath build \
             -exportOptionsPlist export.plist \
             -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8 \
-            -authenticationKeyID $APP_STORE_CONNECT_KEY_ID \
-            -authenticationKeyIssuerID $APP_STORE_CONNECT_ISSUER_ID
+            -authenticationKeyPath ~/private_keys/AuthKey_5B94HC797Q.p8 \
+            -authenticationKeyID 5B94HC797Q \
+            -authenticationKeyIssuerID 20bea6d9-e9af-4805-8ed1-84286ef63d49
     artifacts:
       - $APP_DIR/build/*.ipa
     publishing:
