@@ -12,7 +12,7 @@ workflows:
         script: |
           cd $APP_DIR
           pod install --repo-update
-      - name: Build & Export IPA
+      - name: Build Archive
         script: |
           cd $APP_DIR
           xcodebuild clean archive \
@@ -20,18 +20,18 @@ workflows:
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/TUIKitDemo.xcarchive
+            -archivePath build/TUIKitDemo.xcarchive \
+            -allowProvisioningUpdates
+      - name: Export IPA
+        script: |
+          cd $APP_DIR
+          /usr/libexec/PlistBuddy -c "Add method string app-store" export.plist
+          /usr/libexec/PlistBuddy -c "Add compileBitcode bool false" export.plist
           xcodebuild -exportArchive \
             -archivePath build/TUIKitDemo.xcarchive \
             -exportPath build \
-            -exportOptionsPlist <(echo '<?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-          <key>method</key><string>app-store</string>
-          <key>compileBitcode</key><false/>
-          </dict>
-          </plist>')
+            -exportOptionsPlist export.plist \
+            -allowProvisioningUpdates
     artifacts:
       - $APP_DIR/build/*.ipa
     publishing:
