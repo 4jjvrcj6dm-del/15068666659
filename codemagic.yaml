@@ -6,16 +6,13 @@ workflows:
         XCODE_WORKSPACE: "TUIKitDemo.xcworkspace"
         XCODE_SCHEME: "TUIKitDemo"
         APP_DIR: "Chat/Chat/Swift/TUIKitDemo"
-        DEVELOPMENT_TEAM: "S5SAS3UH9"
       xcode: latest
-      groups:
-        - appstore
     scripts:
       - name: Install CocoaPods
         script: |
           cd $APP_DIR
           pod install --repo-update
-      - name: Build & Archive
+      - name: Build & Export IPA
         script: |
           cd $APP_DIR
           xcodebuild clean archive \
@@ -23,22 +20,18 @@ workflows:
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/TUIKitDemo.xcarchive \
-            -allowProvisioningUpdates \
-            DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM \
-            CODE_SIGN_STYLE=Automatic
-      - name: Export IPA
-        script: |
-          cd $APP_DIR
-          plutil -create xml1 exportOptions.plist
-          defaults write $PWD/exportOptions.plist method app-store
-          defaults write $PWD/exportOptions.plist teamID $DEVELOPMENT_TEAM
-          defaults write $PWD/exportOptions.plist compileBitcode -bool false
+            -archivePath build/TUIKitDemo.xcarchive
           xcodebuild -exportArchive \
             -archivePath build/TUIKitDemo.xcarchive \
             -exportPath build \
-            -exportOptionsPlist exportOptions.plist \
-            -allowProvisioningUpdates
+            -exportOptionsPlist <(echo '<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          <key>method</key><string>app-store</string>
+          <key>compileBitcode</key><false/>
+          </dict>
+          </plist>')
     artifacts:
       - $APP_DIR/build/*.ipa
     publishing:
